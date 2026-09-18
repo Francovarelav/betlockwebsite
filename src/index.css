@@ -7,6 +7,7 @@
   --color-win: #22C55E;
   --color-bg: #08080A;
   --color-surface: #0E0E11;
+  --color-card: #1C1C21;
   --color-line: #1E1E23;
   --color-loss: #EF4444;
 
@@ -30,10 +31,26 @@ body {
   color: #fff;
 }
 
+/* Chrome paints autofilled inputs white; keep them on the dark pill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: currentColor;
+  -webkit-box-shadow: 0 0 0 1000px transparent inset;
+  transition: background-color 9999s ease-out 0s;
+  caret-color: currentColor;
+}
+
+:focus-visible {
+  outline: 2px solid #ED1E24;
+  outline-offset: 3px;
+}
+
+@layer components {
 /* ── Scroll reveal ── */
 .reveal {
   opacity: 0;
-  transform: translateY(28px);
+  transform: translateY(32px);
   transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -42,20 +59,14 @@ body {
   transform: translateY(0);
 }
 
-.stagger > .reveal:nth-child(1) { transition-delay: 0ms; }
-.stagger > .reveal:nth-child(2) { transition-delay: 90ms; }
-.stagger > .reveal:nth-child(3) { transition-delay: 180ms; }
-.stagger > .reveal:nth-child(4) { transition-delay: 270ms; }
-.stagger > .reveal:nth-child(5) { transition-delay: 360ms; }
-
 /* ── Hero entrance ── */
 @keyframes rise {
   from { opacity: 0; transform: translateY(36px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes rise-phone {
-  from { opacity: 0; transform: translateY(48px) rotate(-4deg); }
-  to { opacity: 1; transform: translateY(0) rotate(-7deg); }
+@keyframes rise-stage {
+  from { opacity: 0; transform: translateY(60px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .h-kicker { animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
@@ -63,7 +74,285 @@ body {
 .h-sub    { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both; }
 .h-cta    { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.46s both; }
 .h-note   { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.58s both; }
-.h-phone  { animation: rise-phone 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+.h-phone  { animation: rise-stage 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+
+/* "bet." gets knocked sideways once, like a chip landing */
+@keyframes bet-drop {
+  0%   { transform: translateY(-0.5em) rotate(-8deg); opacity: 0; }
+  60%  { transform: translateY(0.04em) rotate(3deg); opacity: 1; }
+  100% { transform: translateY(0) rotate(-2deg); opacity: 1; }
+}
+.bet-word {
+  display: inline-block;
+  transform-origin: 20% 80%;
+  animation: bet-drop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.9s both;
+}
+
+/* Hero backdrop: a faint red pool of light behind the phone, plus a felt grid */
+.hero-field {
+  background:
+    radial-gradient(60% 55% at 78% 55%, rgba(237, 30, 36, 0.13), transparent 70%),
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px) 0 0 / 64px 64px,
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px) 0 0 / 64px 64px,
+    #08080A;
+}
+
+/* ── Pointer parallax ── */
+.hero-stage { --mx: 0; --my: 0; }
+.par {
+  transform: translate3d(calc(var(--mx) * var(--d) * 1px), calc(var(--my) * var(--d) * 1px), 0);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes float-a {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50%      { transform: translateY(-12px) rotate(calc(var(--r, 0deg) + 3deg)); }
+}
+@keyframes float-b {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50%      { transform: translateY(10px) rotate(calc(var(--r, 0deg) - 2deg)); }
+}
+.float-a { animation: float-a 6s ease-in-out infinite; }
+.float-b { animation: float-b 7.5s ease-in-out infinite; }
+
+/* ── Stickers ── */
+.sticker {
+  display: inline-block;
+  transform: rotate(var(--r, 0deg));
+  border-radius: 999px;
+  padding: 9px 15px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Live dot ── */
+.live-dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ED1E24;
+  flex-shrink: 0;
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #ED1E24;
+  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ping {
+  75%, 100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* ── Poker chip ── */
+.chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transform: rotate(var(--r, 0deg));
+  background:
+    radial-gradient(circle, var(--c) 0 52%, transparent 52.5%),
+    repeating-conic-gradient(from 8deg, #F5F5F5 0 14deg, var(--c) 14deg 45deg);
+  box-shadow:
+    inset 0 0 0 3px var(--c),
+    0 16px 30px -10px rgba(0, 0, 0, 0.8),
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.chip span {
+  display: grid;
+  place-items: center;
+  width: 64%;
+  height: 64%;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-slow { animation: spin 22s linear infinite; }
+
+/* ── Playing cards ── */
+.pcard {
+  --card-w: 70px;
+  --card-h: 100px;
+  width: var(--card-w);
+  height: var(--card-h);
+  perspective: 800px;
+  flex-shrink: 0;
+  animation: deal-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+.pcard + .pcard { margin-left: calc(var(--card-w) * -0.34); }
+@media (min-width: 640px) {
+  .pcard { --card-w: 86px; --card-h: 122px; }
+}
+.felt { --card-h: 100px; }
+@media (min-width: 640px) { .felt { --card-h: 122px; } }
+
+@keyframes deal-in {
+  from { opacity: 0; transform: translate(60px, -80px) rotate(18deg); }
+  to   { opacity: 1; transform: translate(0, 0) rotate(0); }
+}
+
+.pcard-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pcard-inner.is-hidden { transform: rotateY(180deg); }
+
+.pcard-face,
+.pcard-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.pcard-face {
+  background: #FAFAF7;
+  font-family: var(--font-display);
+  font-weight: 900;
+}
+.pcard-corner {
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  font-size: calc(var(--card-w) * 0.2);
+  line-height: 0.95;
+  text-align: center;
+}
+.pcard-corner--flip {
+  top: auto;
+  left: auto;
+  bottom: 7px;
+  right: 8px;
+  transform: rotate(180deg);
+}
+.pcard-pip {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--card-w) * 0.46);
+}
+.pcard-back {
+  transform: rotateY(180deg);
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 8px),
+    #C41A20;
+  border: 4px solid #FAFAF7;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: calc(var(--card-w) * 0.34);
+}
+
+.pcard-slot {
+  width: 70px;
+  height: 100px;
+  border-radius: 10px;
+  border: 1.5px dashed #2c2c33;
+}
+@media (min-width: 640px) { .pcard-slot { width: 86px; height: 122px; } }
+
+.pcard--hero { --card-w: 96px; --card-h: 136px; animation: none; }
+@media (min-width: 640px) { .pcard--hero { --card-w: 118px; --card-h: 166px; } }
+.pcard--step { --card-w: 88px; --card-h: 124px; animation: none; }
+
+/* Blackjack felt */
+.felt {
+  background:
+    radial-gradient(90% 70% at 50% 50%, rgba(237, 30, 36, 0.07), transparent 70%),
+    #0A0A0C;
+  box-shadow: inset 0 0 0 1px #1E1E23;
+}
+
+@keyframes pop-in {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.verdict { animation: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes prize-up {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.prize-reveal { animation: prize-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes modal-bg-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.wheel-modal-bg {
+  background: rgba(5, 5, 7, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: modal-bg-in 0.4s ease-out both;
+}
+
+@keyframes tick {
+  0%   { transform: translateY(-6px); opacity: 0.4; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.balance-tick { animation: tick 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes lock-in {
+  0%   { opacity: 0; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.lock-in { animation: lock-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes lock-pop {
+  0%   { opacity: 0; transform: scale(0.4); }
+  70%  { transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.lock-pop { animation: lock-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ── Step card vignettes react to hover ── */
+.step-chip { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.group:hover .step-chip { transform: rotate(calc(var(--r) + 30deg)) translateY(-8px); }
+.step-card-a, .step-card-b { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.step-card-a { transform: rotate(-10deg); }
+.step-card-b { transform: rotate(8deg); }
+.group:hover .step-card-a { transform: rotate(-18deg) translateX(-10px); }
+.group:hover .step-card-b { transform: rotate(16deg) translateX(10px); }
+.step-lock { transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.group:hover .step-lock { transform: rotate(-8deg) scale(1.06); }
+
+/* ── Strike-through that draws itself in ── */
+.strike {
+  background-image: linear-gradient(#ED1E24, #ED1E24);
+  background-repeat: no-repeat;
+  background-size: 0% 3px;
+  background-position: 0 58%;
+  transition: background-size 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.45s;
+}
+.reveal.visible .strike { background-size: 100% 3px; }
+
+/* ── Marquee ── */
+@keyframes marquee { to { transform: translateX(-25%); } }
+.marquee { animation: marquee 38s linear infinite; }
+.marquee--rev { animation-direction: reverse; animation-duration: 46s; }
+
+/* ── Horizontal snap rows ── */
+.snap-row { scrollbar-width: none; }
+.snap-row::-webkit-scrollbar { display: none; }
 
 /* ── Grain ── */
 @keyframes grain-shift {
@@ -87,12 +376,6 @@ body {
   animation: grain-shift 9s steps(6) infinite;
 }
 
-/* ── Editorial rule ── */
-.rule {
-  height: 1px;
-  background: var(--color-line);
-}
-
 /* ── Link underline ── */
 .ul-link {
   background-image: linear-gradient(currentColor, currentColor);
@@ -103,10 +386,48 @@ body {
 }
 .ul-link:hover { background-size: 100% 1px; }
 
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   .reveal { opacity: 1; transform: none; transition: none; }
-  .h-kicker, .h-title, .h-sub, .h-cta, .h-note, .h-phone { animation: none; }
-  .grain::after { animation: none; }
+  .strike { background-size: 100% 3px; transition: none; }
+  .h-kicker, .h-title, .h-sub, .h-cta, .h-note, .h-phone, .bet-word,
+  .float-a, .float-b, .marquee, .spin-slow, .grain::after, .live-dot::after { animation: none; }
+  .par { transform: none; transition: none; }
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── Admin light theme ── */
+.admin-light {
+  background: #FAFAFA;
+  color: #18181B;
+}
+
+.admin-input {
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #E4E4E7;
+  background: #fff;
+  padding: 0 16px;
+  font-size: 14px;
+  color: #18181B;
+  transition: border-color 0.15s;
+}
+.admin-input::placeholder { color: #A1A1AA; }
+.admin-input:focus { outline: none; border-color: #8B5CF6; }
+
+.admin-btn-primary {
+  height: 48px;
+  border-radius: 12px;
+  background: #8B5CF6;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.admin-btn-primary:hover { background: #7C3AED; }
+.admin-btn-primary:disabled { opacity: 0.5; }

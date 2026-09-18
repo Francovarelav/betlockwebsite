@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from 'firebase/auth'
 import { collection, query, orderBy, getDocs, limit, startAfter, getCountFromServer, deleteDoc, doc } from 'firebase/firestore'
-import { auth, db } from './firebase'
+import { httpsCallable } from 'firebase/functions'
+import { auth, db, functions } from './firebase'
+
+const sendBroadcastFn = httpsCallable(functions, 'sendBroadcast')
 
 const ADMIN_EMAIL = 'franco@varelta.com'
 const PAGE_SIZE = 50
@@ -32,20 +35,20 @@ function LoginScreen({ onLogin }) {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center px-5">
+    <div className="admin-light min-h-screen flex items-center justify-center px-5">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-10 justify-center">
           <img src="/brand/appicon.png" alt="" className="w-10 h-10 rounded-[12px] object-cover" />
-          <span className="text-lg font-bold text-zinc-100 tracking-wide">ADMIN</span>
+          <span className="text-lg font-bold text-zinc-900 tracking-wide">ADMIN</span>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full bg-surface border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-accent transition-colors"
+            className="admin-input"
           />
           <input
             type="password"
@@ -53,18 +56,18 @@ function LoginScreen({ onLogin }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full bg-surface border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-accent transition-colors"
+            className="admin-input"
           />
-          {error && <p className="text-loss text-sm">{error}</p>}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer"
+            className="admin-btn-primary w-full"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-        <a href="/" className="block text-center mt-6 text-sm text-zinc-600 hover:text-zinc-400 transition-colors">
+        <a href="/" className="block text-center mt-6 text-sm text-zinc-400 hover:text-zinc-600 transition-colors">
           &larr; Back to site
         </a>
       </div>
@@ -121,11 +124,9 @@ function Dashboard({ user }) {
       const todayDocs = docs.filter((d) => d.createdAt?.toDate?.() >= todayStart)
       setTodayCount(afterDoc ? todayCount : todayDocs.length)
     } catch (err) {
-      // Never fail to an empty table — an empty list and a rejected read look
-      // identical to the reader, and that is how a broken panel goes unnoticed.
       setLoadError(
         err?.code === 'permission-denied'
-          ? 'Firestore refused this read. Your session predates a permissions change — sign out and back in.'
+          ? 'Firestore refused this read. Sign out and back in.'
           : `Could not load the waitlist: ${err?.message || err}`,
       )
     } finally {
@@ -156,121 +157,260 @@ function Dashboard({ user }) {
 
   const formatDate = (ts) => {
     if (!ts?.toDate) return '—'
-    return ts.toDate().toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    return ts.toDate().toLocaleDateString('es-MX', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
   }
 
   return (
-    <div className="min-h-screen bg-bg text-zinc-100">
-      <header className="border-b border-zinc-800/60 px-6 py-4 flex items-center justify-between">
+    <div className="admin-light min-h-screen">
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-zinc-200 px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/brand/appicon.png" alt="" className="w-8 h-8 rounded-[9px] object-cover" />
-          <span className="text-sm font-bold tracking-wide">BETLOCK ADMIN</span>
+          <img src="/brand/appicon.png" alt="" className="w-7 h-7 rounded-[8px] object-cover" />
+          <span className="text-[13px] font-bold tracking-wide text-zinc-900">BETLOCK</span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-xs text-zinc-500">{user.email}</span>
+          <span className="text-[12px] text-zinc-400">{user.email}</span>
           <button
             onClick={() => signOut(auth)}
-            className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            className="text-[12px] text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
           >
-            Sign out
+            Cerrar sesión
           </button>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="max-w-4xl mx-auto px-6 py-10">
+        <h1 className="text-[22px] font-bold text-zinc-900 mb-8">Waitlist</h1>
+
+        <div className="grid grid-cols-3 gap-3 mb-10">
           {[
-            { label: 'Total signups', value: totalCount },
-            { label: 'Today', value: todayCount },
-            { label: 'This page', value: entries.length },
+            { label: 'Total', value: totalCount, accent: true },
+            { label: 'Hoy', value: todayCount },
+            { label: 'En página', value: entries.length },
           ].map((s) => (
-            <div key={s.label} className="bg-surface rounded-xl border border-zinc-800/60 p-5">
-              <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
-              <p className="text-2xl font-bold text-accent tabular-nums">{s.value}</p>
+            <div key={s.label} className="rounded-2xl border border-zinc-200 bg-white p-5">
+              <p className="text-[12px] font-medium text-zinc-400 uppercase tracking-wide">{s.label}</p>
+              <p className={`mt-1 text-[32px] font-bold tabular-nums leading-none ${s.accent ? 'text-violet-600' : 'text-zinc-900'}`}>{s.value}</p>
             </div>
           ))}
         </div>
 
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-zinc-300">Waitlist Entries</h2>
+          <p className="text-[13px] font-medium text-zinc-500">
+            {totalCount} {totalCount === 1 ? 'registro' : 'registros'}
+          </p>
           <button
             onClick={exportCSV}
-            className="text-xs bg-surface border border-zinc-800 hover:border-zinc-600 text-zinc-300 px-4 py-2 rounded-lg transition-colors cursor-pointer"
+            className="text-[12px] font-medium text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:border-zinc-300 bg-white px-4 py-2 rounded-lg transition-colors cursor-pointer"
           >
-            Export CSV
+            Exportar CSV
           </button>
         </div>
 
         {loadError && (
-          <div className="mb-4 border border-loss/40 bg-loss/10 text-loss rounded-xl px-5 py-4 text-sm">
+          <div className="mb-4 border border-red-200 bg-red-50 text-red-600 rounded-xl px-5 py-4 text-sm">
             {loadError}
           </div>
         )}
 
-        <div className="bg-surface border border-zinc-800/60 rounded-xl overflow-hidden">
+        <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-zinc-800/60 text-zinc-500 text-xs">
-                <th className="text-left px-5 py-3 font-medium">#</th>
-                <th className="text-left px-5 py-3 font-medium">Email</th>
-                <th className="text-left px-5 py-3 font-medium">Joined</th>
-                <th className="px-5 py-3" />
+              <tr className="border-b border-zinc-100 text-zinc-400">
+                <th className="text-left px-5 py-3 font-medium text-[12px]">#</th>
+                <th className="text-left px-5 py-3 font-medium text-[12px]">Email</th>
+                <th className="text-left px-5 py-3 font-medium text-[12px]">Fecha</th>
+                <th className="px-5 py-3 w-24" />
               </tr>
             </thead>
             <tbody>
               {entries.map((entry, i) => (
-                <tr key={entry.id} className="border-b border-zinc-800/30 hover:bg-zinc-900/40 transition-colors group">
-                  <td className="px-5 py-3 text-zinc-600 tabular-nums">{i + 1}</td>
-                  <td className="px-5 py-3 text-zinc-200">{entry.email}</td>
-                  <td className="px-5 py-3 text-zinc-500">{formatDate(entry.createdAt)}</td>
-                  <td className="px-5 py-3 text-right">
+                <tr key={entry.id} className="border-b border-zinc-50 hover:bg-zinc-50/80 transition-colors group">
+                  <td className="px-5 py-3.5 text-zinc-300 tabular-nums text-[13px]">{i + 1}</td>
+                  <td className="px-5 py-3.5 text-zinc-800 font-medium text-[13px]">{entry.email}</td>
+                  <td className="px-5 py-3.5 text-zinc-400 text-[13px]">{formatDate(entry.createdAt)}</td>
+                  <td className="px-5 py-3.5 text-right">
                     {confirmId === entry.id ? (
                       <span className="inline-flex items-center gap-3">
                         <button
                           onClick={() => remove(entry.id)}
-                          className="text-xs text-loss hover:underline cursor-pointer"
+                          className="text-[12px] text-red-500 hover:underline cursor-pointer font-medium"
                         >
-                          Confirm
+                          Sí, borrar
                         </button>
                         <button
                           onClick={() => setConfirmId(null)}
-                          className="text-xs text-zinc-600 hover:text-zinc-400 cursor-pointer"
+                          className="text-[12px] text-zinc-400 hover:text-zinc-600 cursor-pointer"
                         >
-                          Cancel
+                          No
                         </button>
                       </span>
                     ) : (
                       <button
                         onClick={() => setConfirmId(entry.id)}
-                        className="text-xs text-zinc-700 hover:text-loss opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+                        className="text-[12px] text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all cursor-pointer"
                       >
-                        Remove
+                        Borrar
                       </button>
                     )}
                   </td>
                 </tr>
               ))}
-              {entries.length === 0 && !loading && (
+              {entries.length === 0 && !loading && !loadError && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-zinc-600">No entries yet</td>
+                  <td colSpan={4} className="px-5 py-12 text-center text-zinc-400 text-[14px]">Sin registros todavía</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {loading && <p className="text-center text-zinc-600 text-sm mt-6">Loading...</p>}
+        {loading && (
+          <div className="flex justify-center py-8">
+            <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
 
         {hasMore && !loading && (
           <button
             onClick={() => fetchEntries(lastDoc)}
-            className="mt-4 w-full text-sm text-zinc-400 hover:text-zinc-200 py-3 transition-colors cursor-pointer"
+            className="mt-4 w-full text-[13px] text-zinc-400 hover:text-zinc-700 py-3 transition-colors cursor-pointer font-medium"
           >
-            Load more
+            Cargar más
           </button>
         )}
+
+        <EmailTools totalCount={totalCount} />
+      </div>
+    </div>
+  )
+}
+
+function EmailTools({ totalCount }) {
+  const [testEmail, setTestEmail] = useState('')
+  const [testTemplate, setTestTemplate] = useState('confirmation')
+  const [testStatus, setTestStatus] = useState('')
+  const [broadcastStatus, setBroadcastStatus] = useState('')
+  const [confirmBroadcast, setConfirmBroadcast] = useState(false)
+
+  const sendTest = async (e) => {
+    e.preventDefault()
+    const trimmed = testEmail.toLowerCase().trim()
+    if (!trimmed) return
+    setTestStatus('sending')
+    try {
+      await sendBroadcastFn({
+        to: trimmed,
+        template: testTemplate,
+        subject: testTemplate === 'launch'
+          ? '[TEST] BETLOCK is live 🎰'
+          : "[TEST] You're on the BETLOCK waitlist 🎰",
+      })
+      setTestStatus('done')
+    } catch (err) {
+      setTestStatus(`Error: ${err.message}`)
+    }
+  }
+
+  const sendBroadcast = async () => {
+    setBroadcastStatus('sending')
+    setConfirmBroadcast(false)
+    try {
+      const result = await sendBroadcastFn({
+        subject: "BETLOCK is live 🎰 — Your first month is free",
+        template: 'launch',
+      })
+      const { sent, failed, total } = result.data
+      setBroadcastStatus(`Enviado a ${sent}/${total} emails${failed ? ` (${failed} fallidos)` : ''}`)
+    } catch (err) {
+      setBroadcastStatus(`Error: ${err.message}`)
+    }
+  }
+
+  return (
+    <div className="mt-10 pt-8 border-t border-zinc-200">
+      <h2 className="text-[16px] font-bold text-zinc-900 mb-6">Email Tools</h2>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* Test email */}
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+          <p className="text-[13px] font-semibold text-zinc-800 mb-1">Enviar email de prueba</p>
+          <p className="text-[12px] text-zinc-400 mb-4">Manda la plantilla solo a esta dirección. No la registra en la waitlist y puedes repetirlo las veces que quieras.</p>
+          <div className="flex gap-2 mb-2">
+            {[['confirmation', 'Confirmación'], ['launch', 'Lanzamiento']].map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setTestTemplate(val)}
+                className={`h-8 px-3 rounded-lg text-[12px] font-medium cursor-pointer transition-colors ${testTemplate === val ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <form onSubmit={sendTest} className="flex gap-2">
+            <input
+              type="email"
+              required
+              placeholder="test@email.com"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="admin-input flex-1"
+              style={{ height: 40, fontSize: 13 }}
+            />
+            <button
+              type="submit"
+              disabled={testStatus === 'sending'}
+              className="admin-btn-primary px-4 shrink-0"
+              style={{ height: 40, fontSize: 13 }}
+            >
+              {testStatus === 'sending' ? 'Enviando...' : 'Enviar test'}
+            </button>
+          </form>
+          {testStatus === 'done' && (
+            <p className="mt-2 text-[12px] text-emerald-600 font-medium">Enviado. Debería llegar en unos segundos.</p>
+          )}
+          {testStatus && testStatus !== 'done' && testStatus !== 'sending' && (
+            <p className="mt-2 text-[12px] text-red-500">{testStatus}</p>
+          )}
+        </div>
+
+        {/* Broadcast */}
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+          <p className="text-[13px] font-semibold text-zinc-800 mb-1">Broadcast de lanzamiento</p>
+          <p className="text-[12px] text-zinc-400 mb-4">Envía el email de "we're live" a <strong>todos</strong> los {totalCount} emails de la waitlist.</p>
+          {confirmBroadcast ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={sendBroadcast}
+                className="text-[13px] font-semibold text-red-600 hover:underline cursor-pointer"
+              >
+                Sí, enviar a todos
+              </button>
+              <button
+                onClick={() => setConfirmBroadcast(false)}
+                className="text-[13px] text-zinc-400 hover:text-zinc-600 cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmBroadcast(true)}
+              disabled={broadcastStatus === 'sending' || totalCount === 0}
+              className="admin-btn-primary w-full disabled:opacity-50"
+              style={{ height: 40, fontSize: 13, background: '#DC2626' }}
+            >
+              {broadcastStatus === 'sending' ? 'Enviando a todos...' : `Enviar a ${totalCount} personas`}
+            </button>
+          )}
+          {broadcastStatus && broadcastStatus !== 'sending' && (
+            <p className={`mt-2 text-[12px] font-medium ${broadcastStatus.startsWith('Error') ? 'text-red-500' : 'text-emerald-600'}`}>
+              {broadcastStatus}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -286,37 +426,33 @@ function VerifyScreen({ user }) {
       await sendEmailVerification(user)
       setSent(true)
     } catch {
-      setErr('Could not send. Wait a minute and try again.')
+      setErr('No se pudo enviar. Espera un momento e intenta de nuevo.')
     }
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center px-5 text-center">
+    <div className="admin-light min-h-screen flex items-center justify-center px-5 text-center">
       <div className="max-w-sm">
         <img src="/brand/appicon.png" alt="" className="w-11 h-11 rounded-[13px] object-cover mx-auto mb-8" />
-        <h1 className="text-lg font-semibold text-zinc-100 mb-3">Verify this address</h1>
+        <h1 className="text-lg font-bold text-zinc-900 mb-3">Verifica tu email</h1>
         <p className="text-sm text-zinc-500 leading-relaxed mb-8">
-          Waitlist access is only granted to a verified <span className="text-zinc-300">{user.email}</span>.
-          This is what stops anyone else from registering your address and reading the list.
+          Se necesita verificar <span className="text-zinc-800 font-medium">{user.email}</span> antes de acceder al panel.
         </p>
         {sent ? (
-          <p className="text-sm text-win">
-            Sent. Open the link, then reload this page.
+          <p className="text-sm text-emerald-600 font-medium">
+            Enviado. Abre el link y recarga esta página.
           </p>
         ) : (
-          <button
-            onClick={send}
-            className="w-full bg-accent hover:bg-accent-hover text-white font-semibold py-3 rounded-xl transition-colors cursor-pointer"
-          >
-            Send verification email
+          <button onClick={send} className="admin-btn-primary w-full">
+            Enviar email de verificación
           </button>
         )}
-        {err && <p className="mt-3 text-sm text-loss">{err}</p>}
+        {err && <p className="mt-3 text-sm text-red-500">{err}</p>}
         <button
           onClick={() => signOut(auth)}
-          className="block mx-auto mt-6 text-sm text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+          className="block mx-auto mt-6 text-sm text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer"
         >
-          Sign out
+          Cerrar sesión
         </button>
       </div>
     </div>
@@ -340,8 +476,8 @@ export default function AdminPanel() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <div className="admin-light min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }

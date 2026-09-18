@@ -10,25 +10,15 @@ service cloud.firestore {
     // If this account is ever deleted and recreated, update this uid.
     function isAdmin() {
       return request.auth != null
-        && request.auth.uid == '5lebcavXCOfUfXwU9Xvt0UMo8883';
-    }
-
-    // A signup may only ever contain these two fields, and createdAt must be
-    // the server's own clock — a client cannot backdate or forge its position.
-    function isValidSignup() {
-      let d = request.resource.data;
-      return d.keys().hasOnly(['email', 'createdAt'])
-        && d.keys().hasAll(['email', 'createdAt'])
-        && d.email is string
-        && d.email.size() > 4
-        && d.email.size() < 254
-        && d.email.matches('^[^@]+@[^@]+[.][^@]+$')
-        && d.createdAt == request.time;
+        && request.auth.uid == '5lebcavXCOfUfXwU9Xvt0UMo8883'
+        && request.auth.token.email_verified == true;
     }
 
     match /waitlist/{docId} {
-      // Anyone may join the waitlist.
-      allow create: if isValidSignup();
+      // Signups only arrive through the joinWaitlist Cloud Function, which
+      // rate limits by IP and session. A direct client write would bypass
+      // that, so there is none.
+      allow create: if false;
       // Only the admin may ever read the list of signups.
       allow read: if isAdmin();
       // A signup is never editable — but the admin must be able to honour
