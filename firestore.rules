@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Pinned to the admin account's uid rather than its email address.
+    // Anyone can self-register any email with the public API key, but a uid is
+    // issued by Firebase and cannot be chosen — so an impostor holding the
+    // address still gets a different uid, and no access.
+    // If this account is ever deleted and recreated, update this uid.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == '5lebcavXCOfUfXwU9Xvt0UMo8883';
+    }
+
+    // A signup may only ever contain these two fields, and createdAt must be
+    // the server's own clock — a client cannot backdate or forge its position.
+    function isValidSignup() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['email', 'createdAt'])
+        && d.keys().hasAll(['email', 'createdAt'])
+        && d.email is string
+        && d.email.size() > 4
+        && d.email.size() < 254
+        && d.email.matches('^[^@]+@[^@]+[.][^@]+$')
+        && d.createdAt == request.time;
+    }
+
+    match /waitlist/{docId} {
+      // Anyone may join the waitlist.
+      allow create: if isValidSignup();
+      // Only the admin may ever read the list of signups.
+      allow read: if isAdmin();
+      // A signup is never editable — but the admin must be able to honour
+      // a removal request.
+      allow delete: if isAdmin();
+      allow update: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

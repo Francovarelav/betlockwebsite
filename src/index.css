@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #ED1E24;
+  --color-accent-hover: #F0474B;
+  --color-accent-deep: #C41A20;
+  --color-win: #22C55E;
+  --color-bg: #08080A;
+  --color-surface: #0E0E11;
+  --color-line: #1E1E23;
+  --color-loss: #EF4444;
+
+  --font-sans: 'Satoshi', system-ui, -apple-system, sans-serif;
+  --font-display: 'Cabinet Grotesk', 'Satoshi', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #08080A;
+}
+
+::selection {
+  background: #ED1E24;
+  color: #fff;
+}
+
+/* ── Scroll reveal ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stagger > .reveal:nth-child(1) { transition-delay: 0ms; }
+.stagger > .reveal:nth-child(2) { transition-delay: 90ms; }
+.stagger > .reveal:nth-child(3) { transition-delay: 180ms; }
+.stagger > .reveal:nth-child(4) { transition-delay: 270ms; }
+.stagger > .reveal:nth-child(5) { transition-delay: 360ms; }
+
+/* ── Hero entrance ── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(36px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rise-phone {
+  from { opacity: 0; transform: translateY(48px) rotate(-4deg); }
+  to { opacity: 1; transform: translateY(0) rotate(-7deg); }
+}
+
+.h-kicker { animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.h-title  { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.h-sub    { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both; }
+.h-cta    { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.46s both; }
+.h-note   { animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) 0.58s both; }
+.h-phone  { animation: rise-phone 1.3s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both; }
+
+/* ── Grain ── */
+@keyframes grain-shift {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-8%, 4%); }
+  40% { transform: translate(5%, -6%); }
+  60% { transform: translate(-4%, 8%); }
+  80% { transform: translate(6%, 2%); }
+}
+
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: -40%;
+  width: 180%;
+  height: 180%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 9999;
+  animation: grain-shift 9s steps(6) infinite;
+}
+
+/* ── Editorial rule ── */
+.rule {
+  height: 1px;
+  background: var(--color-line);
+}
+
+/* ── Link underline ── */
+.ul-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  transition: background-size 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ul-link:hover { background-size: 100% 1px; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .h-kicker, .h-title, .h-sub, .h-cta, .h-note, .h-phone { animation: none; }
+  .grain::after { animation: none; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
