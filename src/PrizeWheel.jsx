@@ -1,16 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 
-const SEGMENTS = [
-  { label: '1 day free',   color: '#27272A', text: '#A1A1AA' },
-  { label: '1 month free', color: '#ED1E24', text: '#FFFFFF' },
-  { label: 'Nothing',      color: '#18181B', text: '#71717A' },
-  { label: '1 week free',  color: '#27272A', text: '#A1A1AA' },
-  { label: '1 day free',   color: '#18181B', text: '#A1A1AA' },
-  { label: '1 month free', color: '#ED1E24', text: '#FFFFFF' },
-  { label: 'Nothing',      color: '#27272A', text: '#71717A' },
-  { label: '1 week free',  color: '#18181B', text: '#A1A1AA' },
-]
+// Every slice is the same perk: everyone on the waitlist gets it. The spin is
+// just the reveal — a wheel with prizes nobody can land would be deceptive.
+const SEGMENTS = Array.from({ length: 8 }, (_, i) => (
+  i % 2 === 0
+    ? { label: '1 month free', color: '#ED1E24', text: '#FFFFFF' }
+    : { label: '1 month free', color: '#27272A', text: '#FFFFFF' }
+))
 
 const WINNING_INDEX = 1
 const SEG_ANGLE = 360 / SEGMENTS.length
@@ -174,7 +171,7 @@ export default function PrizeWheel({ onClose }) {
             Waitlist perk
           </p>
           <h2 className="font-display font-[900] uppercase text-[clamp(1.6rem,5vw,2.4rem)] tracking-[-0.03em] text-white leading-tight">
-            Spin for your prize
+            Spin to reveal your perk
           </h2>
         </div>
 
@@ -197,7 +194,7 @@ export default function PrizeWheel({ onClose }) {
               1 month free!
             </p>
             <p className="mt-3 text-[15px] text-zinc-400 leading-relaxed max-w-[32ch] mx-auto">
-              Your prize will be applied automatically on launch day. Check your email for confirmation.
+              Everyone on the waitlist gets 1 month of Pro free. On launch day we’ll email you an App Store offer code to redeem it.
             </p>
 
             <div className="flex flex-col items-center gap-3 mt-8">

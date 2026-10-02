@@ -179,17 +179,19 @@ function sessionId() {
 
 function WaitlistForm({ tone = 'dark', id, compact = false }) {
   const [email, setEmail] = useState('')
+  const [agreed, setAgreed] = useState(false)
   const [status, setStatus] = useState('idle')
 
   const submit = async (e) => {
     e.preventDefault()
     const trimmed = email.toLowerCase().trim()
-    if (!trimmed || status === 'loading' || status === 'redirecting') return
+    if (!trimmed || !agreed || status === 'loading' || status === 'redirecting') return
     setStatus('loading')
     try {
       const { data } = await joinWaitlist({
         email: trimmed,
         session: sessionId(),
+        consent: agreed,
         website: e.currentTarget.elements.website?.value || '',
       })
       // The gift lives on its own page; this ticket is what lets it open.
@@ -243,6 +245,25 @@ function WaitlistForm({ tone = 'dark', id, compact = false }) {
             : <Arrow className="w-4 h-4 transition-transform duration-300 group-hover:rotate-45" />}
         </button>
       </div>
+      {/* Consent: unchecked by default, required to submit, and recorded server-side. */}
+      <label htmlFor={`${id}-consent`} className={`mt-3 pl-4 flex items-start gap-2.5 text-[12px] leading-[1.5] cursor-pointer ${onRed ? 'text-white/90' : 'text-zinc-400'}`}>
+        <input
+          id={`${id}-consent`}
+          type="checkbox"
+          required
+          checked={agreed}
+          disabled={busy}
+          onChange={(e) => setAgreed(e.target.checked)}
+          className={`mt-[2px] w-4 h-4 shrink-0 cursor-pointer ${onRed ? 'accent-zinc-950' : 'accent-accent'}`}
+        />
+        <span>
+          I’m 18 or older, I agree to the{' '}
+          <a href="/terms" target="_blank" rel="noopener" className={`underline ${onRed ? 'text-white' : 'text-zinc-200'}`}>Terms of Use</a>{' '}
+          and{' '}
+          <a href="/privacy" target="_blank" rel="noopener" className={`underline ${onRed ? 'text-white' : 'text-zinc-200'}`}>Privacy Policy</a>,
+          and I want emails about the BETLOCK launch. Unsubscribe any time.
+        </span>
+      </label>
       {status === 'error' && (
         <p className={`mt-2 pl-4 font-mono text-[12px] ${onRed ? 'text-white' : 'text-loss'}`}>Something went wrong. Try again.</p>
       )}
@@ -416,7 +437,7 @@ const losses = [
 
 const faqs = [
   ['01', 'Does it actually lock my phone?', 'Yes. BETLOCK uses Apple’s Screen Time API to block the apps you pick. At zero balance a real block screen appears. It is not an honor system.'],
-  ['02', 'Is this gambling? Is it legal?', 'No money is wagered. You bet minutes, not pesos. No gaming licence required, and nothing to lose but time you were going to lose anyway.'],
+  ['02', 'Is this gambling?', 'No. These are simulated casino games for entertainment, 18+ only. No real money is wagered or won, and minutes have no cash value: they can’t be bought, sold or redeemed for anything.'],
   ['03', 'Can I just turn it off?', 'You can revoke the permission in Settings. You can also walk out of the gym. The product only works on people who want the stakes.'],
   ['04', 'Android?', 'Not yet. Android has no equivalent blocking API. iOS 17 and up for now.'],
   ['05', 'Can I go negative?', 'Yes. A negative balance carries into tomorrow. Every morning you get a base balance so there is always a way back.'],
@@ -897,7 +918,7 @@ function FAQ() {
           <Kicker className="text-zinc-500 mb-6">08 — Questions</Kicker>
           <Display className="text-[clamp(2.2rem,4.4vw,3.6rem)] max-w-[10ch]">Before you ask.</Display>
           <p className="mt-6 text-zinc-500 text-[15px] leading-relaxed max-w-[30ch]">
-            Something else? <a href="mailto:hello@betlock.app" className="text-zinc-200 ul-link">hello@betlock.app</a>
+            Something else? <a href="mailto:hello@betlockapp.com" className="text-zinc-200 ul-link">hello@betlockapp.com</a>
           </p>
         </Reveal>
         <Reveal className="lg:col-span-8" delay={100}>
@@ -1001,7 +1022,7 @@ function Landing() {
             <div className="flex flex-wrap gap-x-8 gap-y-3 font-mono text-[11px] tracking-[0.14em] uppercase text-zinc-500">
               <a href="/privacy" className="hover:text-zinc-200 ul-link transition-colors">Privacy</a>
               <a href="/terms" className="hover:text-zinc-200 ul-link transition-colors">Terms</a>
-              <a href="mailto:hello@betlock.app" className="hover:text-zinc-200 ul-link transition-colors">Contact</a>
+              <a href="mailto:hello@betlockapp.com" className="hover:text-zinc-200 ul-link transition-colors">Contact</a>
               <a href="#" className="hover:text-zinc-200 ul-link transition-colors">Instagram</a>
               <a href="#" className="hover:text-zinc-200 ul-link transition-colors">TikTok</a>
             </div>

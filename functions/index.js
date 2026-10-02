@@ -16,6 +16,13 @@ const SMTP_PASS = defineSecret("SMTP_PASS");
 
 const ADMIN_UID = "5lebcavXCOfUfXwU9Xvt0UMo8883";
 const FROM = '"BETLOCK" <hello@betlockapp.com>';
+// One-click unsubscribe target. Requests land in this inbox; mark the
+// waitlist doc `unsubscribed: true` and the broadcast skips it.
+const UNSUBSCRIBE = "mailto:hello@betlockapp.com?subject=Unsubscribe";
+const LIST = { unsubscribe: { url: UNSUBSCRIBE, comment: "Unsubscribe" } };
+// Bump when the Terms or Privacy Policy change, so each signup records
+// which version it agreed to.
+const CONSENT_VERSION = "2026-10-02";
 
 const allSecrets = [SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS];
 
@@ -77,11 +84,15 @@ export const joinWaitlist = onCall(
     cors: true,
   },
   async (request) => {
-    const { email: raw, session, website } = request.data || {};
+    const { email: raw, session, website, consent } = request.data || {};
 
     // Honeypot: a field humans never see. Bots that fill it get a fake
     // success so they have no signal to adapt to.
     if (website) return { status: "ok" };
+
+    if (consent !== true) {
+      throw new HttpsError("failed-precondition", "Consent is required.");
+    }
 
     const email = String(raw || "").toLowerCase().trim();
     if (email.length < 5 || email.length > 254 || !EMAIL_RE.test(email)) {
@@ -135,6 +146,15 @@ export const joinWaitlist = onCall(
         email,
         prize: PRIZE,
         createdAt: FieldValue.serverTimestamp(),
+        // Proof of consent: 18+, Terms + Privacy, and launch emails.
+        consent: {
+          version: CONSENT_VERSION,
+          age18: true,
+          terms: true,
+          privacy: true,
+          marketingEmails: true,
+          at: FieldValue.serverTimestamp(),
+        },
       });
       return { status: "ok", prize: PRIZE };
     });
@@ -157,6 +177,7 @@ export const onWaitlistSignup = onDocumentCreated(
     await transport.sendMail({
       from: FROM,
       to: email,
+      list: LIST,
       subject: "You're on the BETLOCK waitlist 🎰",
       html: confirmationHtml(email),
     });
@@ -190,7 +211,7 @@ export const sendBroadcast = onCall(
       const addr = String(to).toLowerCase().trim();
       if (!EMAIL_RE.test(addr)) throw new HttpsError("invalid-argument", "Invalid email.");
       const body = template === "launch" ? launchHtml() : confirmationHtml(addr);
-      await mailer().sendMail({ from: FROM, to: addr, subject, html: body });
+      await mailer().sendMail({ from: FROM, to: addr, subject, html: body, list: LIST });
       return { sent: 1, failed: 0, total: 1 };
     }
 
@@ -213,9 +234,9 @@ export const sendBroadcast = onCall(
 
     for (const doc of snap.docs) {
       const addr = doc.data().email;
-      if (!addr) continue;
+      if (!addr || doc.data().unsubscribed) continue;
       try {
-        await transport.sendMail({ from: FROM, to: addr, subject, html });
+        await transport.sendMail({ from: FROM, to: addr, subject, html, list: LIST });
         sent++;
       } catch (err) {
         console.error(`Failed to send to ${addr}:`, err.message);
@@ -329,6 +350,11 @@ function layout({ preheader, hero, body }) {
     <p style="margin:14px 0 0;font:400 12px/19px ${FONT};color:#52525B;">
       You’re receiving this because you joined the waitlist at
       <a href="${SITE}" style="color:#71717A;text-decoration:underline;">betlockapp.com</a>.
+      <a href="${UNSUBSCRIBE}" style="color:#71717A;text-decoration:underline;">Unsubscribe</a>.
+    </p>
+    <p style="margin:6px 0 0;font:400 12px/19px ${FONT};color:#52525B;">
+      Varelta · Monterrey, Nuevo León, Mexico ·
+      <a href="${SITE}/privacy" style="color:#71717A;text-decoration:underline;">Privacy</a>
     </p>
   </td></tr>
 
@@ -361,7 +387,7 @@ function confirmationHtml(email) {
       <tr><td style="padding:28px 30px 30px;">
         ${eyebrow("Your waitlist gift", "#FFD6D7")}
         <p style="margin:10px 0 0;font:900 40px/40px ${FONT};letter-spacing:-1.6px;text-transform:uppercase;color:#FFFFFF;">1 month free</p>
-        <p style="margin:10px 0 0;font:400 15px/22px ${FONT};color:#FFE9EA;">Applied automatically on launch day. No code, nothing to remember.</p>
+        <p style="margin:10px 0 0;font:400 15px/22px ${FONT};color:#FFE9EA;">On launch day we’ll email you an App Store offer code to redeem it.</p>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;"><tr>
           <td bgcolor="#0E0E11" style="background:#0E0E11;border-radius:999px;padding:9px 14px;font:600 12px/12px ${MONO};color:#FAFAFA;">${escapeHtml(email)}</td>
         </tr></table>
@@ -416,7 +442,7 @@ function launchHtml() {
       <tr><td style="padding:28px 30px 30px;">
         ${eyebrow("Waitlist gift · unlocked", "#FFD6D7")}
         <p style="margin:10px 0 0;font:900 40px/40px ${FONT};letter-spacing:-1.6px;text-transform:uppercase;color:#FFFFFF;">Your first month is free</p>
-        <p style="margin:10px 0 0;font:400 15px/22px ${FONT};color:#FFE9EA;">Download with this email and it’s already applied. No code needed.</p>
+        <p style="margin:10px 0 0;font:400 15px/22px ${FONT};color:#FFE9EA;">Redeem the App Store offer code in this email to activate it.</p>
       </td></tr>
     </table>
   </td></tr>
