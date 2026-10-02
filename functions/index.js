@@ -1,10 +1,10 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { createTransport } from "nodemailer";
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 initializeApp();
 const db = getFirestore();
@@ -16,10 +16,10 @@ const SMTP_PASS = defineSecret("SMTP_PASS");
 
 const ADMIN_UID = "5lebcavXCOfUfXwU9Xvt0UMo8883";
 const FROM = '"BETLOCK" <hello@betlockapp.com>';
-// One-click unsubscribe target. Requests land in this inbox; mark the
-// waitlist doc `unsubscribed: true` and the broadcast skips it.
-const UNSUBSCRIBE = "mailto:hello@betlockapp.com?subject=Unsubscribe";
-const LIST = { unsubscribe: { url: UNSUBSCRIBE, comment: "Unsubscribe" } };
+// Every email carries a signed, per-person unsubscribe link (footer and
+// List-Unsubscribe header, one-click per RFC 8058). The `unsubscribe`
+// function below marks the waitlist doc and the broadcast skips it.
+const UNSUB_PLACEHOLDER = "__UNSUB_URL__";
 // Bump when the Terms or Privacy Policy change, so each signup records
 // which version it agreed to.
 const CONSENT_VERSION = "2026-10-02";
@@ -177,10 +177,85 @@ export const onWaitlistSignup = onDocumentCreated(
     await transport.sendMail({
       from: FROM,
       to: email,
-      list: LIST,
+      ...unsubHeaders(email),
       subject: "You're on the BETLOCK waitlist 🎰",
-      html: confirmationHtml(email),
+      html: withUnsub(confirmationHtml(email), email),
     });
+  },
+);
+
+// ── Unsubscribe ──
+// Same id the signup uses for the waitlist doc. The token is an HMAC of it,
+// so a link can only unsubscribe the address it was sent to.
+
+const waitlistId = (email) => sha256(email).slice(0, 40);
+const unsubToken = (id) =>
+  createHmac("sha256", secret(SMTP_PASS)).update(`unsub:${id}`).digest("hex").slice(0, 32);
+
+function unsubUrl(email) {
+  const id = waitlistId(email);
+  return `${SITE}/unsubscribe?id=${id}&t=${unsubToken(id)}`;
+}
+
+function unsubHeaders(email) {
+  return {
+    list: { unsubscribe: { url: unsubUrl(email), comment: "Unsubscribe" } },
+    headers: { "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+  };
+}
+
+// Templates carry a placeholder; custom broadcast HTML gets a footer line.
+function withUnsub(html, email) {
+  const url = unsubUrl(email);
+  if (html.includes(UNSUB_PLACEHOLDER)) return html.split(UNSUB_PLACEHOLDER).join(url);
+  const line = `<p style="font:12px/18px sans-serif;color:#71717A;">Don’t want these emails? <a href="${url}">Unsubscribe</a>.</p>`;
+  return html.includes("</body>") ? html.replace("</body>", `${line}</body>`) : html + line;
+}
+
+function unsubPage(title, text, form = "") {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — BETLOCK</title><meta name="robots" content="noindex"></head>
+<body style="margin:0;background:#09090B;color:#FAFAFA;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;">
+<main style="max-width:440px;margin:18vh auto;padding:0 20px;">
+<h1 style="font-size:28px;letter-spacing:-.02em;margin:0 0 12px;">${title}</h1>
+<p style="color:#A1A1AA;margin:0 0 24px;">${text}</p>${form}
+<p style="margin-top:32px;"><a href="${SITE}" style="color:#A1A1AA;">betlockapp.com</a></p>
+</main></body></html>`;
+}
+
+export const unsubscribe = onRequest(
+  { secrets: [SMTP_PASS], region: "us-central1", maxInstances: 3 },
+  async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const id = String(req.query.id || "");
+    const t = String(req.query.t || "");
+    const valid =
+      /^[0-9a-f]{40}$/.test(id) &&
+      /^[0-9a-f]{32}$/.test(t) &&
+      timingSafeEqual(Buffer.from(t), Buffer.from(unsubToken(id)));
+
+    if (!valid) {
+      res.status(400).send(unsubPage("Link not valid", "This unsubscribe link is broken or incomplete. Email hello@betlockapp.com and we’ll remove you by hand."));
+      return;
+    }
+
+    // GET only asks: mail scanners open links, and that mustn't unsubscribe
+    // anyone. The button (or a mail client's one-click POST) does it.
+    if (req.method === "POST") {
+      const ref = db.collection("waitlist").doc(id);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.update({ unsubscribed: true, unsubscribedAt: FieldValue.serverTimestamp() });
+      }
+      res.status(200).send(unsubPage("You’re unsubscribed", "You won’t get any more BETLOCK emails."));
+      return;
+    }
+
+    const action = `/unsubscribe?id=${id}&t=${t}`;
+    res.status(200).send(unsubPage(
+      "Unsubscribe?",
+      "You’ll stop getting BETLOCK waitlist and launch emails.",
+      `<form method="post" action="${action}"><button type="submit" style="font:600 16px/1 inherit;background:#ED1E24;color:#fff;border:0;border-radius:999px;padding:14px 22px;cursor:pointer;">Unsubscribe</button></form>`,
+    ));
   },
 );
 
@@ -211,7 +286,7 @@ export const sendBroadcast = onCall(
       const addr = String(to).toLowerCase().trim();
       if (!EMAIL_RE.test(addr)) throw new HttpsError("invalid-argument", "Invalid email.");
       const body = template === "launch" ? launchHtml() : confirmationHtml(addr);
-      await mailer().sendMail({ from: FROM, to: addr, subject, html: body, list: LIST });
+      await mailer().sendMail({ from: FROM, to: addr, subject, html: withUnsub(body, addr), ...unsubHeaders(addr) });
       return { sent: 1, failed: 0, total: 1 };
     }
 
@@ -236,7 +311,7 @@ export const sendBroadcast = onCall(
       const addr = doc.data().email;
       if (!addr || doc.data().unsubscribed) continue;
       try {
-        await transport.sendMail({ from: FROM, to: addr, subject, html, list: LIST });
+        await transport.sendMail({ from: FROM, to: addr, subject, html: withUnsub(html, addr), ...unsubHeaders(addr) });
         sent++;
       } catch (err) {
         console.error(`Failed to send to ${addr}:`, err.message);
@@ -350,7 +425,7 @@ function layout({ preheader, hero, body }) {
     <p style="margin:14px 0 0;font:400 12px/19px ${FONT};color:#52525B;">
       You’re receiving this because you joined the waitlist at
       <a href="${SITE}" style="color:#71717A;text-decoration:underline;">betlockapp.com</a>.
-      <a href="${UNSUBSCRIBE}" style="color:#71717A;text-decoration:underline;">Unsubscribe</a>.
+      <a href="${UNSUB_PLACEHOLDER}" style="color:#71717A;text-decoration:underline;">Unsubscribe</a>.
     </p>
     <p style="margin:6px 0 0;font:400 12px/19px ${FONT};color:#52525B;">
       Varelta · Monterrey, Nuevo León, Mexico ·

@@ -1023,8 +1023,7 @@ function Landing() {
               <a href="/privacy" className="hover:text-zinc-200 ul-link transition-colors">Privacy</a>
               <a href="/terms" className="hover:text-zinc-200 ul-link transition-colors">Terms</a>
               <a href="mailto:hello@betlockapp.com" className="hover:text-zinc-200 ul-link transition-colors">Contact</a>
-              <a href="#" className="hover:text-zinc-200 ul-link transition-colors">Instagram</a>
-              <a href="#" className="hover:text-zinc-200 ul-link transition-colors">TikTok</a>
+              <a href="https://www.tiktok.com/@betlockapp" target="_blank" rel="noopener noreferrer" className="hover:text-zinc-200 ul-link transition-colors">TikTok</a>
             </div>
           </div>
           <div className="mt-10 flex flex-col sm:flex-row justify-between gap-2 font-mono text-[11px] tracking-[0.1em] uppercase text-zinc-600">
