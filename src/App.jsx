@@ -810,24 +810,28 @@ function Games() {
               <span className="text-accent">Real odds.</span>
             </Display>
             <p className="mt-7 text-[clamp(1rem,1.4vw,1.18rem)] text-zinc-400 leading-relaxed max-w-[38ch]">
-              Not a metaphor for a casino — a casino. The dealer stands on all 17s. The wheel doesn’t care that you have a deadline.
+              Simulated, but not watered down. The dealer stands on all 17s. The wheel doesn’t care that you have a deadline.
             </p>
           </Reveal>
           <Reveal delay={120}>
             <div className="mt-10 space-y-2 max-w-[440px]">
               {[
-                ['Blackjack', 'Beat the dealer without busting', 'Pays 3:2'],
-                ['Roulette', 'Red, black or a number', 'Up to 35:1'],
-                ['More tables', 'Coming after launch', 'Soon'],
-              ].map(([name, desc, pay], i) => (
-                <div key={name} className={`flex items-center justify-between gap-4 rounded-2xl px-5 py-4 ${i === 2 ? 'border border-dashed border-zinc-700' : 'bg-surface border border-line'}`}>
+                ['Blackjack', 'Table game · beat the dealer without busting', 'Pays 3:2'],
+                ['Roulette', 'Table game · red, black or a number', 'Up to 35:1'],
+                ['Mines', 'Unlock game · pick safe tiles, cash out any time', 'Multiplier'],
+                ['Crash', 'Unlock game · cash out before the line crashes', 'Multiplier'],
+              ].map(([name, desc, pay]) => (
+                <div key={name} className="flex items-center justify-between gap-4 rounded-2xl px-5 py-4 bg-surface border border-line">
                   <div>
-                    <p className={`font-display font-[800] uppercase text-[18px] tracking-[-0.01em] ${i === 2 ? 'text-zinc-500' : ''}`}>{name}</p>
+                    <p className="font-display font-[800] uppercase text-[18px] tracking-[-0.01em]">{name}</p>
                     <p className="text-[13.5px] text-zinc-500">{desc}</p>
                   </div>
-                  <span className={`shrink-0 font-mono text-[11px] tracking-[0.1em] uppercase rounded-full px-3 py-1.5 ${i === 2 ? 'text-zinc-500 bg-card' : 'text-accent bg-accent/10'}`}>{pay}</span>
+                  <span className="shrink-0 font-mono text-[11px] tracking-[0.1em] uppercase rounded-full px-3 py-1.5 text-accent bg-accent/10">{pay}</span>
                 </div>
               ))}
+              <p className="pt-2 text-[12.5px] leading-relaxed text-zinc-400">
+                Table games move your daily balance. Unlock games spend minutes to open your locked apps. All four are simulated casino games: 18+, no real money, no prizes, and minutes have no cash value.
+              </p>
             </div>
           </Reveal>
         </div>
@@ -853,7 +857,7 @@ function Games() {
 }
 
 function Pricing() {
-  const features = ['Blackjack & roulette', 'Real app blocking via Screen Time', 'Balance, history & 7-day chart', 'Streaks & multipliers']
+  const features = ['Blackjack, roulette, Mines & Crash', 'Real app blocking via Screen Time', 'Balance, history & 7-day chart', 'Streaks & multipliers']
   return (
     <section id="pricing" className="py-24 sm:py-32 border-t border-line bg-surface scroll-mt-16">
       <div className="max-w-[1320px] mx-auto px-5 sm:px-10">
